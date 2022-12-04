@@ -1,0 +1,62 @@
+version: '3'
+
+services:
+  # obs access signer
+  obs-access-signer:
+    image: obs-access-signer:dev
+    networks:
+      - obs
+    build:
+      context: ..
+    env_file:
+      - ../.config/example.env
+    ports:
+      - "127.0.0.1:9002:9002"
+
+  # Varnish cache proxy
+  varnish:
+    image: varnish:stable
+    networks:
+      - obs
+    volumes:
+      - ./default.vcl:/etc/varnish/default.vcl:ro
+    ports:
+      - "127.0.0.1:8080:80"
+      - "127.0.0.1:8443:8443"
+
+  # intended as S3-compatible gateway test
+  minio:
+    image: quay.io/minio/minio
+    networks:
+      - obs
+    env_file:
+      - ../.config/example.env
+    command:
+      - server
+      - /data
+      - --console-address
+      - :9001
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+  
+  # setup minio bucket
+  mc-create-bucket:
+    image: minio/mc
+    networks:
+      - obs
+    env_file:
+      - ../.config/example.env
+    entrypoint:
+      - sh
+      - -c
+      - |
+        mc config host add min http://minio:9000 $$MINIO_ACCESS_KEY $$MINIO_SECRET_KEY
+        mc rm -r --force min/$$OBS_BUCKET_NAME
+        mc mb min/$$OBS_BUCKET_NAME
+        mc policy download min/$$OBS_BUCKET_NAME
+    depends_on:
+      - minio
+
+networks:
+  obs: {}
