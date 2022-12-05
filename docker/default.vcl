@@ -12,14 +12,27 @@
 # new 4.0 format.
 vcl 4.0;
 
+import std;
+import directors;
+
 # Default backend definition. Set this to point to your content server.
-backend default {
+backend obsb1 {
     .host = "obs-access-signer";
     .port = "9002";
     .connect_timeout = 300s;
     .first_byte_timeout = 300s;
     .between_bytes_timeout = 300s;
     .max_connections = 800;
+}
+
+acl purge {
+    "localhost";
+    "127.0.0.0"/8;
+}
+
+sub vcl_init {
+    new vdir = directors.round_robin();
+    vdir.add_backend(obsb1);
 }
 
 sub vcl_hash {
@@ -37,6 +50,16 @@ sub vcl_recv {
     # Typically you clean up the request here, removing cookies you don't need,
     # rewriting the request, etc.
     
+    // cache purge
+    if (req.method == "PURGE") {
+        if (!client.ip ~ purge) {
+            return (synth(405, "Not Allowed"));
+        }
+        return (purge);
+    }
+
+    set req.backend_hint = vdir.backend();
+
     if (req.method == "PRI") {
         /* We do not support SPDY or HTTP/2.0 */
         return (synth(405));
@@ -70,7 +93,7 @@ sub vcl_backend_response {
         return (deliver);
     }
 
-    # keep last content in case backend goes down.
+    # keep last stale content in case backend goes down.
     set beresp.grace = 6h;
 
     # cache timeout
@@ -86,7 +109,7 @@ sub vcl_deliver {
     # You can do accounting or modifying the final object here.
 
     set resp.http.Via = regsuball(resp.http.Via, "\s\([a-zA-Z0-9\/.]+\)", "");
-    set resp.http.Server = "VOAS";
+    set resp.http.Server = "voasis";
 
     # Debug header to see if it's a HIT/MISS and the number of hits
     if (obj.hits > 0) {
@@ -106,6 +129,22 @@ sub vcl_deliver {
     # unset resp.http.Via;
 
     return (deliver);
+}
+
+sub vcl_hit {
+    // TTL still valid
+    if (obj.ttl >= 0s) {
+        return (deliver);
+    }
+
+    // Misbehaving backend:
+    // https://varnish-cache.org/docs/trunk/users-guide/vcl-grace.html
+
+    return (deliver);
+}
+
+sub vcl_miss {
+
 }
 
 sub vcl_backend_error {
