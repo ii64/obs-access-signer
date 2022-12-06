@@ -1,18 +1,12 @@
-FROM ii64/golang-zig:go1.18-alpine3.15-zig AS builder
+FROM golang:alpine as build
+RUN apk --no-cache add ca-certificates
 
-WORKDIR /build
-COPY . /build
+RUN mkdir /newtmp && chown 1777 /newtmp
 
-RUN apk add --no-cache \
-    make
+FROM scratch
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=build /newtmp /tmp
 
-RUN --mount=type=cache,mode=0755,target=/go/pkg/mod make dep
-RUN make build
+COPY obs-access-signer /
 
-
-FROM gcr.io/distroless/static-debian11
-
-WORKDIR /app
-COPY --from=builder /build/obs-access-signer /app/obs-access-signer
-
-ENTRYPOINT [ "/app/obs-access-signer" ]
+ENTRYPOINT ["/obs-access-signer"]
