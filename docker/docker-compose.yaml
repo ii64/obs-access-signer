@@ -3,11 +3,11 @@ version: '3'
 services:
   # obs access signer
   obs-access-signer:
-    image: obs-access-signer:dev
-    networks:
-      - obs
+    # image: obs-access-signer:dev
     build:
       context: ..
+    networks:
+      - obs
     env_file:
       - ../.config/example.env
     ports:

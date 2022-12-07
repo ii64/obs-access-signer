@@ -40,6 +40,7 @@ func init() {
 	flag.BoolVar(&defaultObsOpts.Secure, "obs-secure", ok1(strconv.ParseBool(os.Getenv("OBS_SECURE"))), "OBS secure transport")
 	flag.StringVar(&defaultObsOpts.BucketName, "obs-bucket", os.Getenv("OBS_BUCKET_NAME"), "OBS bucket name")
 
+	flag.BoolVar(&defaultObsOpts.RedirectSecure, "obs-redirect-secure", ok1(strconv.ParseBool(os.Getenv("OBS_REDIRECT_SECURE"))), "OBS redirect secure transport")
 	flag.StringVar(&defaultObsOpts.HostRedirect, "obs-host-redirect", os.Getenv("OBS_HOST_REDIRECT"), "OBS host redirect")
 
 	// obsSignedUrlExpiry, err = time.ParseDuration(os.Getenv("OBS_SIGNED_URL_EXPIRY"))
@@ -72,7 +73,9 @@ func main() {
 	sug := logger.Named("main").Sugar()
 	sug.Infow("starting",
 		"log_level", zapLogLevel,
+		"obs_bucket", defaultObsOpts.BucketName,
 		"obs_endpoint", defaultObsOpts.Endpoint,
+		"obs_redirect_secure", defaultObsOpts.RedirectSecure,
 		"obs_host_redirect", defaultObsOpts.HostRedirect,
 	)
 

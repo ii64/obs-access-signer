@@ -20,7 +20,8 @@ type obsOptions struct {
 	Secure     bool
 	BucketName string
 
-	HostRedirect string
+	RedirectSecure bool
+	HostRedirect   string
 }
 
 var defaultObsOpts obsOptions

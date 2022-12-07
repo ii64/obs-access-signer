@@ -130,6 +130,12 @@ func (s *server) handle(ctx *fasthttp.RequestCtx) {
 	query := req.URL.Query()
 	query.Set("Expires", exp)
 	req.URL.RawQuery = s3utils.QueryEncode(query)
+	if s.opts.OBS.RedirectSecure {
+		req.URL.Scheme = "https"
+	} else {
+		req.URL.Scheme = "http"
+	}
+
 	if hostRedirect := s.opts.OBS.HostRedirect; hostRedirect != "" {
 		req.URL.Host = hostRedirect
 	}
