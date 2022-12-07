@@ -86,12 +86,10 @@ func (s *server) handle(ctx *fasthttp.RequestCtx) {
 	path := ctx.Path()
 	_path := bytes.TrimLeft(path, "/")
 	objectName := unsafeByteSliceToString(_path)
-	if _, _objectName, found := bytes.Cut(_path, []byte(bucketName)); !isVirtualHostStyle &&
-		bytes.HasPrefix(_path, []byte(bucketName)) &&
-		found {
-		_objectName = bytes.TrimLeft(_objectName, "/")
-		objectName = unsafeByteSliceToString(_objectName)
-	}
+
+	s.logger.Debugw("handle",
+		"bucket", bucketName,
+		"objectName", objectName)
 
 	// check if we had access to the object
 	if _, err := s.opts.S3.StatObject(ctx, bucketName, objectName, minio.GetObjectOptions{}); err != nil {
