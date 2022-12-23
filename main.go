@@ -4,6 +4,7 @@ import (
 	"flag"
 	"os"
 	"strconv"
+	"time"
 
 	_ "github.com/joho/godotenv/autoload"
 	"go.uber.org/zap"
@@ -11,9 +12,8 @@ import (
 )
 
 var (
-	httpAddr string
-	logLevel string
-	// obsSignedUrlExpiry time.Duration
+	httpAddr      string
+	logLevel      string
 	zapLogLevel   zapcore.Level
 	postFlagParse = []func(){}
 )
@@ -22,10 +22,10 @@ func init() {
 	var err error
 	_ = err
 
-	// app
+	// -- app
 	flag.StringVar(&httpAddr, "addr", os.Getenv("HTTP_ADDR"), "Server address")
 
-	// log
+	// -- log
 	flag.StringVar(&logLevel, "log-level", os.Getenv("LOG_LEVEL"), "Log level")
 	qpostFlagParse(func() {
 		err := zapLogLevel.UnmarshalText([]byte(logLevel))
@@ -34,7 +34,7 @@ func init() {
 		}
 	})
 
-	// OBS
+	// -- OBS
 	flag.StringVar(&defaultObsOpts.Endpoint, "obs-endpoint", os.Getenv("OBS_ENDPOINT"), "OBS host")
 	flag.StringVar(&defaultObsOpts.Region, "obs-region", os.Getenv("OBS_REGION"), "OBS region")
 	flag.BoolVar(&defaultObsOpts.Secure, "obs-secure", ok1(strconv.ParseBool(os.Getenv("OBS_SECURE"))), "OBS secure transport")
@@ -43,12 +43,25 @@ func init() {
 	flag.BoolVar(&defaultObsOpts.RedirectSecure, "obs-redirect-secure", ok1(strconv.ParseBool(os.Getenv("OBS_REDIRECT_SECURE"))), "OBS redirect secure transport")
 	flag.StringVar(&defaultObsOpts.HostRedirect, "obs-host-redirect", os.Getenv("OBS_HOST_REDIRECT"), "OBS host redirect")
 
-	// obsSignedUrlExpiry, err = time.ParseDuration(os.Getenv("OBS_SIGNED_URL_EXPIRY"))
-	// if err != nil {
-	// 	// max signed value
-	// 	obsSignedUrlExpiry = time.Duration(^uint64(0) / 2)
-	// }
-	// flag.DurationVar(&obsSignedUrlExpiry, "obs-signed-url-expiry", obsSignedUrlExpiry, "OBS ")
+	// redirect http code
+	var obsRedirectCode = int64(defaultObsOpts.RedirectCode)
+	if obsRedirectCodeStr := os.Getenv("OBS_REDIRECT_CODE"); obsRedirectCodeStr != "" {
+		obsRedirectCode, err = strconv.ParseInt(obsRedirectCodeStr, 10, 64)
+		if err != nil {
+			obsRedirectCode = int64(defaultObsOpts.RedirectCode)
+		}
+	}
+	flag.IntVar(&defaultObsOpts.RedirectCode, "obs-redirect-code", int(obsRedirectCode), "OBS redirect http code")
+
+	// url expiry
+	var obsUrlExpiry = defaultObsOpts.URLExpiry
+	if obsUrlExpiryStr := os.Getenv("OBS_URL_EXPIRY"); obsUrlExpiryStr != "" {
+		if obsUrlExpiry, err = time.ParseDuration(obsUrlExpiryStr); err != nil {
+			obsUrlExpiry = defaultObsOpts.URLExpiry
+		}
+	}
+	flag.DurationVar(&defaultObsOpts.URLExpiry, "obs-url-expiry", obsUrlExpiry, "OBS url expiry")
+
 }
 
 func qpostFlagParse(f func()) {
@@ -77,6 +90,8 @@ func main() {
 		"obs_endpoint", defaultObsOpts.Endpoint,
 		"obs_redirect_secure", defaultObsOpts.RedirectSecure,
 		"obs_host_redirect", defaultObsOpts.HostRedirect,
+		"obs_redirect_code", defaultObsOpts.RedirectCode,
+		"obs_url_expiry", defaultObsOpts.URLExpiry.String(),
 	)
 
 	client := unwrap1(newObsClient(defaultObsOpts))

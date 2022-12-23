@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"time"
 	"unsafe"
 
 	"github.com/minio/minio-go/v7"
@@ -21,10 +22,17 @@ type obsOptions struct {
 	BucketName string
 
 	RedirectSecure bool
+	RedirectCode   int // HTTP redirect status code
+	URLExpiry      time.Duration
 	HostRedirect   string
 }
 
-var defaultObsOpts obsOptions
+const maxURLExpiry = time.Duration(int64(^uint64(0) / 2))
+
+var defaultObsOpts = obsOptions{
+	URLExpiry:    maxURLExpiry,
+	RedirectCode: http.StatusMovedPermanently, // 301
+}
 
 func newObsClient(opts obsOptions) (*minio.Client, error) {
 	client, err := minio.New(opts.Endpoint, &minio.Options{

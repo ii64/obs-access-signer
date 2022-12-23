@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -23,8 +24,6 @@ type serverOptions struct {
 	Addr   string
 	Logger *zap.Logger
 	OBS    *obsOptions
-
-	ObjectExpiry time.Duration
 
 	S3 *minio.Client
 }
@@ -99,11 +98,12 @@ func (s *server) handle(ctx *fasthttp.RequestCtx) {
 	}
 
 	// compose initial request
+	expireSeconds := int64(s.opts.OBS.URLExpiry / time.Second)
 	req, err := newRequest(s.opts.S3, ctx, http.MethodGet, requestMetadata{
 		presignURL:  true,
 		bucketName:  bucketName,
 		objectName:  objectName,
-		expires:     1, // to trigger presigned generator
+		expires:     expireSeconds, // to trigger presigned generator
 		queryValues: url.Values{},
 	})
 	if err != nil {
@@ -120,8 +120,28 @@ func (s *server) handle(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	// clear given params, set max signed value for expire, and re-presign.
-	exp := strconv.FormatInt(int64(^uint64(0)/2), 10) // ~250years
+	var statusCode = s.opts.OBS.RedirectCode
+
+	// custom "expiry"
+	var exp string
+	if expiry := s.opts.OBS.URLExpiry; expiry == maxURLExpiry || expiry <= 0 {
+		// clear given params, set max signed value for expire, and re-presign.
+		exp = strconv.FormatInt(int64(^uint64(0)/2), 10) // ~250years
+	} else {
+		// we can't allow a permanent redirect here since we already have
+		// expiry set, the redirected url needs to be updated.
+		if statusCode == http.StatusMovedPermanently || (statusCode < 300 || statusCode > 399) {
+			statusCode = http.StatusTemporaryRedirect
+		}
+
+		expireAt := time.Now().UTC().Add(s.opts.OBS.URLExpiry)
+		exp = strconv.FormatInt(int64(expireAt.Unix()), 10)
+		// set object cache lifetime
+		if statusCode == http.StatusTemporaryRedirect {
+			ctx.Response.Header.Set("Cache-Control", fmt.Sprintf("max-age=%d", expireSeconds))
+			ctx.Response.Header.Set("Expires", expireAt.Format("Mon, 02 Jan 2006 15:04:05 GMT"))
+		}
+	}
 	req.Header.Set("Expires", exp)
 	req.URL.RawQuery = ""
 	req = signer.PreSignV2(*req, value.AccessKeyID, value.SecretAccessKey, 0, isVirtualHostStyle)
@@ -130,6 +150,7 @@ func (s *server) handle(ctx *fasthttp.RequestCtx) {
 	query := req.URL.Query()
 	query.Set("Expires", exp)
 	req.URL.RawQuery = s3utils.QueryEncode(query)
+
 	if s.opts.OBS.RedirectSecure {
 		req.URL.Scheme = "https"
 	} else {
@@ -140,7 +161,7 @@ func (s *server) handle(ctx *fasthttp.RequestCtx) {
 		req.URL.Host = hostRedirect
 	}
 
-	ctx.Redirect(req.URL.String(), http.StatusMovedPermanently)
+	ctx.Redirect(req.URL.String(), statusCode)
 }
 
 func (s *server) Run() {
