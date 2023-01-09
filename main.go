@@ -117,6 +117,7 @@ func main() {
 		"server_mode", serverMode,
 		// Generic OBS
 		"obs_bucket", defaultObsOpts.BucketName,
+		"obs_remove_bucket_name", defaultObsOpts.RemoveBucketName,
 		"obs_redirect_secure", defaultObsOpts.RedirectSecure,
 		"obs_host_redirect", defaultObsOpts.HostRedirect,
 		"obs_redirect_code", defaultObsOpts.RedirectCode,

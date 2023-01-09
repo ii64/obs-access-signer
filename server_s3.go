@@ -73,9 +73,11 @@ func (s *serverS3) handle(ctx *fasthttp.RequestCtx) {
 
 	path := ctx.Path()
 	_path := bytes.TrimLeft(path, "/")
-	if _, _pathWithoutBucketName, found := bytes.Cut(_path, []byte(`/`)); found {
-		// no need to check `isVirtualHostStyle` since this is our own implementation of handling request URI
-		_path = _pathWithoutBucketName
+	if s.opts.RemoveBucketName {
+		if _, _pathWithoutBucketName, found := bytes.Cut(_path, []byte(`/`)); found {
+			// no need to check `isVirtualHostStyle` since this is our own implementation of handling request URI
+			_path = _pathWithoutBucketName
+		}
 	}
 	objectName := unsafeByteSliceToString(_path)
 

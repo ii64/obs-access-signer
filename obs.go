@@ -16,11 +16,14 @@ type obsOptions struct {
 	RedirectCode   int // HTTP redirect status code
 	URLExpiry      time.Duration
 	HostRedirect   string
+
+	RemoveBucketName bool
 }
 
 var defaultObsOpts = obsOptions{
-	URLExpiry:    maxURLExpiry,
-	RedirectCode: http.StatusMovedPermanently, // 301
+	URLExpiry:        maxURLExpiry,
+	RedirectCode:     http.StatusMovedPermanently, // 301
+	RemoveBucketName: false,
 }
 
 func (opts *obsOptions) Bind(fs *flag.FlagSet) (err error) {
@@ -64,5 +67,11 @@ func (opts *obsOptions) Bind(fs *flag.FlagSet) (err error) {
 		vObsUrlExpiry = obsUrlExpiry
 	}
 	fs.DurationVar(&opts.URLExpiry, "obs-url-expiry", vObsUrlExpiry, "OBS Redirection URL expiry")
+
+	var vObsRemoveBucketName = opts.RemoveBucketName
+	if sObsRemoveBucketName := os.Getenv("OBS_REMOVE_BUCKET_NAME"); sObsRemoveBucketName != "" {
+		vObsRemoveBucketName, _ = strconv.ParseBool(sObsRemoveBucketName)
+	}
+	fs.BoolVar(&opts.RemoveBucketName, "obs-remove-bucket-name", vObsRemoveBucketName, "OBS Remove Bucket name from prefix")
 	return
 }
